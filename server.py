@@ -1,6 +1,6 @@
 """deepseek-scout MCP server.
 
-Two tools that offload codebase exploration from Claude to a fast DeepSeek
+Tools that offload codebase exploration from an MCP client to a selected
 agent, returning compact, citation-verified handoffs:
 
   find             — Explore-agent replacement (question in, verified brief out)
@@ -12,7 +12,7 @@ Register with:
 
 import json
 
-from mcp.server import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 from scout.agent import (
     narrate_subgraph,
@@ -27,7 +27,7 @@ from scout.config import MAX_EDGES_RENDERED
 from scout.depgraph import bfs_tree, build_graph, match_target, render_tree
 from scout.gitutils import resolve_exploration_root, sweep_stale_worktrees
 
-mcp = MCPServer("deepseek-scout")
+mcp = FastMCP("deepseek-scout")
 
 
 @mcp.tool()
@@ -56,11 +56,11 @@ def find(
         thoroughness: "quick" (first solid answer), "medium" (answer plus
             context, default), or "thorough" (exhaustive sweep). Controls how
             many search iterations the scout gets.
-        thinking: Reasoning depth of the scout model — pick per question:
+        thinking: Requested reasoning depth (provider/model dependent):
             "none" for simple where-is-X lookups (fastest), "low" for routine
             questions, "medium"/"high" for tangled control flow, cross-cutting
             architecture questions, or suspected-bug hunts. "max" is the
-            highest effort. "auto" (default, or the DEEPSEEK_THINKING env
+            highest effort. "auto" (default, or the SCOUT_THINKING env
             pin) uses the provider's default effort.
         git_ref: Explore a clean snapshot of this commit/branch/tag (e.g.
             "HEAD", "main", a sha) instead of the working tree. Use whenever

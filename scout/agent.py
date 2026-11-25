@@ -1,6 +1,6 @@
-"""DeepSeek agent loop for find(), plus the narrative pass for map_dependencies().
+"""Provider-neutral agent loop for find(), plus the narrative pass for map_dependencies().
 
-The loop gives DeepSeek read-only local tools and requires it to finish by
+The loop gives the selected model read-only local tools and requires it to finish by
 calling submit_handoff. Handoffs with invalid file:line citations are
 rejected back into the loop and retried — Claude only ever sees verified
 citations.
@@ -21,6 +21,7 @@ from .config import (
 )
 from .gitutils import annotate_citation_dates, resolve_exploration_root
 from .localtools import LocalTools
+from .providers import parse_tool_args
 
 # Static on purpose: DeepSeek's automatic prefix cache is keyed on exact
 # bytes, so a constant system prompt + constant tool schemas means every
@@ -157,54 +158,25 @@ TOOLS = [
 
 
 def _resolve_thinking(level: str | None) -> str:
-    level = (level or THINKING_DEFAULT or "auto").lower().strip()
+    level = (level or "auto").lower().strip()
+    if level == "auto":
+        level = THINKING_DEFAULT.lower().strip() or "auto"
     return level if level in THINKING_LEVELS else "auto"
 
 
 def _create(client, thinking: str, *, force_tool: str | None = None,
             deterministic: bool = False, **kwargs):
-    """DeepSeek-native completion call.
-
-    - Forced tool_choice is incompatible with thinking mode (hard 400), so a
-      forced call always runs with reasoning_effort="none" — forcing is only
-      used for submit-now moments where structure matters more than depth.
-    - deterministic=True sets temperature to 0.0 for verdict/verifier calls.
-      DeepSeek ignores temperature in thinking mode, so this only affects
-      non-thinking calls.
-    - "auto" omits reasoning_effort and uses DeepSeek's default effort
-      (currently high).
-    """
-    if force_tool:
-        kwargs["tool_choice"] = {"type": "function", "function": {"name": force_tool}}
-        kwargs["reasoning_effort"] = "none"
-    elif thinking != "auto":
-        kwargs["reasoning_effort"] = thinking
-    if deterministic:
-        kwargs["temperature"] = 0.0
-    return client.chat.completions.create(**kwargs)
+    """Dispatch a completion to the explicitly selected provider."""
+    return client.complete(thinking, force_tool=force_tool, deterministic=deterministic, **kwargs)
 
 
 def _assistant_message(message, tool_calls: list) -> dict:
-    """Serialize an assistant turn for the next DeepSeek tool-call request."""
-    assistant_msg: dict = {"role": "assistant", "content": message.content or ""}
-    reasoning_content = getattr(message, "reasoning_content", None)
-    if reasoning_content is not None:
-        # DeepSeek requires this field to be carried into later tool-call turns.
-        assistant_msg["reasoning_content"] = reasoning_content
-    if tool_calls:
-        assistant_msg["tool_calls"] = [
-            {
-                "id": tc.id,
-                "type": "function",
-                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-            }
-            for tc in tool_calls
-        ]
-    return assistant_msg
+    """Preserve the adapter's complete assistant turn for tool-result replay."""
+    return message.wire
 
 
 def _add_cache_usage(resp, stats: dict) -> None:
-    """Accumulate DeepSeek prefix-cache usage (prompt_cache_hit/miss_tokens)."""
+    """Accumulate provider prefix-cache usage (prompt_cache_hit/miss_tokens)."""
     u = getattr(resp, "usage", None)
     if not u:
         return
@@ -324,9 +296,10 @@ def _run_find_inner(
 
         for tc in tool_calls:
             try:
-                args = json.loads(tc.function.arguments or "{}")
-            except json.JSONDecodeError:
-                args = {}
+                args = parse_tool_args(TOOLS, tc.function.name, tc.function.arguments)
+            except ValueError as e:
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": f"Invalid tool call: {e}"})
+                continue
 
             if tc.function.name == "submit_handoff":
                 errors = verify_locations(tools.root, args.get("key_locations", []))
@@ -447,7 +420,7 @@ def narrate_subgraph(
     dependents_text: str,
     thinking: str | None = None,
 ) -> str:
-    """One-shot DeepSeek pass turning a deterministic subgraph into a risk narrative."""
+    """One-shot model pass turning a deterministic subgraph into a risk narrative."""
     client = get_client()
     level = _resolve_thinking(thinking)
     prompt = (
@@ -591,9 +564,10 @@ def run_sanity_check(
 
         for tc in tool_calls:
             try:
-                args = json.loads(tc.function.arguments or "{}")
-            except json.JSONDecodeError:
-                args = {}
+                args = parse_tool_args(tool_list, tc.function.name, tc.function.arguments)
+            except ValueError as e:
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": f"Invalid tool call: {e}"})
+                continue
             if tc.function.name == "submit_verdict":
                 verdict = _normalize_verdict(args)
                 verdict["_stats"] = {
@@ -766,6 +740,9 @@ def _verify_claims_inner(
         if not p.is_file():
             results[i] = {"index": i, "status": "NOT_FOUND", "evidence": f"file does not exist: {path}"}
             continue
+        if p.stat().st_size > 5_000_000:
+            results[i] = {"index": i, "status": "NOT_FOUND", "evidence": "file exceeds read limit"}
+            continue
         total = len(p.read_text(encoding="utf-8", errors="replace").splitlines())
         if line is not None and not (1 <= int(line) <= total):
             results[i] = {"index": i, "status": "NOT_FOUND",
@@ -796,9 +773,9 @@ def _verify_claims_inner(
             m = resp.choices[0].message
             for tc in [t for t in (m.tool_calls or []) if getattr(t, "function", None)]:
                 try:
-                    payload = json.loads(tc.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    payload = {}
+                    payload = parse_tool_args([SUBMIT_CLAIMS_TOOL], tc.function.name, tc.function.arguments)
+                except ValueError:
+                    continue
                 for v in payload.get("verdicts", []):
                     if isinstance(v.get("index"), int):
                         found[v["index"]] = v

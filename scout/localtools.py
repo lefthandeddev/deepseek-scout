@@ -1,4 +1,4 @@
-"""Read-only filesystem tools the DeepSeek agent can call.
+"""Read-only filesystem tools the scout agent can call.
 
 Every path is resolved against the exploration root and rejected if it
 escapes — the scout can never read outside the repo it was pointed at.
@@ -6,8 +6,6 @@ escapes — the scout can never read outside the repo it was pointed at.
 
 import fnmatch
 import re
-import shutil
-import subprocess
 from pathlib import Path
 
 from .config import MAX_GLOB_RESULTS, MAX_GREP_CHARS, MAX_READ_LINES
@@ -104,6 +102,18 @@ class LocalTools:
         p = (self.root / rel_path).resolve()
         if p != self.root and self.root not in p.parents:
             raise ValueError(f"Path escapes exploration root: {rel_path}")
+        if _is_sensitive(p.relative_to(self.root)) or _is_ignored(p.relative_to(self.root)):
+            raise ValueError("Path is excluded from Scout exploration")
+        # Reject symlinks and sensitive aliases as well as escaped targets.
+        raw = self.root / rel_path
+        try:
+            lexical = raw.relative_to(self.root)
+        except ValueError:
+            raise ValueError("Path escapes exploration root") from None
+        if ".." in lexical.parts or _is_sensitive(lexical) or _is_ignored(lexical):
+            raise ValueError("Path is excluded from Scout exploration")
+        if any((self.root.joinpath(*lexical.parts[:i])).is_symlink() for i in range(1, len(lexical.parts) + 1)):
+            raise ValueError("Symlinks are excluded from Scout exploration")
         return p
 
     def _rel(self, p: Path) -> str:
@@ -111,9 +121,13 @@ class LocalTools:
 
     def _walk_files(self):
         for p in sorted(self.root.rglob("*")):
-            if p.is_file():
+            if p.is_file() and not p.is_symlink():
                 rel = p.relative_to(self.root)
                 if not _is_ignored(rel) and not _is_sensitive(rel):
+                    try:
+                        self._resolve(rel.as_posix())
+                    except ValueError:
+                        continue
                     yield p
 
     # ---------- tools ----------
@@ -145,7 +159,7 @@ class LocalTools:
             entries = sorted(d.iterdir(), key=lambda e: (e.is_file(), e.name.lower()))
             for e in entries:
                 rel = e.relative_to(self.root)
-                if e.name in IGNORE_DIRS or _is_sensitive(rel):
+                if e.is_symlink() or e.name in IGNORE_DIRS or _is_sensitive(rel):
                     continue
                 indent = "  " * level
                 if e.is_dir():
@@ -162,28 +176,8 @@ class LocalTools:
     def grep(self, pattern: str, glob: str = "", max_results: int = 60) -> str:
         """Regex search across the repo. Returns path:line:text matches."""
         self.call_count += 1
-        rg = shutil.which("rg")
-        if rg:
-            cmd = [rg, "-n", "--no-heading", "-S", "-m", "5", "--max-columns", "300"]
-            if glob:
-                cmd += ["-g", glob]
-            for glob_pattern in RG_SENSITIVE_GLOBS:
-                cmd += ["-g", glob_pattern]
-            cmd += [pattern, str(self.root)]
-            try:
-                out = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=30,
-                    encoding="utf-8", errors="replace",
-                )
-                text = out.stdout
-                if not text.strip():
-                    return f"No matches for: {pattern}"
-                # Make paths root-relative.
-                text = text.replace(str(self.root) + "\\", "").replace(str(self.root) + "/", "")
-                lines = text.splitlines()[:max_results]
-                return _redact_secrets("\n".join(lines)[:MAX_GREP_CHARS])
-            except subprocess.TimeoutExpired:
-                return "grep timed out — narrow the pattern or add a glob filter"
+        # Scan and redact whole file contents before extracting matching lines.
+        # This avoids leaking fragments of multiline credentials via grep.
         return self._python_grep(pattern, glob, max_results)
 
     def _python_grep(self, pattern: str, glob: str, max_results: int) -> str:
@@ -205,9 +199,12 @@ class LocalTools:
             except OSError:
                 continue
             per_file = 0
-            for i, line in enumerate(content.splitlines(), 1):
+            raw_lines = content.splitlines()
+            safe_lines = _redact_secrets(content).splitlines()
+            for i, line in enumerate(raw_lines, 1):
                 if rx.search(line):
-                    results.append(f"{rel}:{i}:{line.strip()[:300]}")
+                    safe = safe_lines[i - 1] if i <= len(safe_lines) else "[REDACTED]"
+                    results.append(f"{rel}:{i}:{safe.strip()[:300]}")
                     per_file += 1
                     if per_file >= 5:
                         break
@@ -229,7 +226,7 @@ class LocalTools:
         if p.stat().st_size > 5_000_000:
             return f"File too large to read: {rel_path} ({p.stat().st_size} bytes)"
         try:
-            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            lines = _redact_secrets(p.read_text(encoding="utf-8", errors="replace")).splitlines()
         except OSError as e:
             return f"Cannot read {rel_path}: {e}"
         total = len(lines)

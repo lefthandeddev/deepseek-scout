@@ -1,1 +1,1 @@
-"""deepseek-scout — DeepSeek-powered codebase exploration MCP server."""
+"""deepseek-scout — provider-neutral codebase exploration MCP server."""

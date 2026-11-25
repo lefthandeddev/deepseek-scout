@@ -1,0 +1,180 @@
+{
+  "deepseek": {
+    "base_url": "https://api.deepseek.com",
+    "key_env": "DEEPSEEK_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "deepseek",
+    "model": "deepseek-flash",
+    "check_model": "deepseek-v4-pro"
+  },
+  "openai": {
+    "base_url": "https://api.openai.com/v1",
+    "key_env": "OPENAI_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "anthropic": {
+    "base_url": "https://api.anthropic.com/v1",
+    "key_env": "ANTHROPIC_API_KEY",
+    "protocol": "anthropic",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "gemini": {
+    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "key_env": "GEMINI_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "openrouter": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "key_env": "OPENROUTER_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "groq": {
+    "base_url": "https://api.groq.com/openai/v1",
+    "key_env": "GROQ_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "xai": {
+    "base_url": "https://api.x.ai/v1",
+    "key_env": "XAI_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "mistral": {
+    "base_url": "https://api.mistral.ai/v1",
+    "key_env": "MISTRAL_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "together": {
+    "base_url": "https://api.together.xyz/v1",
+    "key_env": "TOGETHER_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "fireworks": {
+    "base_url": "https://api.fireworks.ai/inference/v1",
+    "key_env": "FIREWORKS_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "cerebras": {
+    "base_url": "https://api.cerebras.ai/v1",
+    "key_env": "CEREBRAS_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "deepinfra": {
+    "base_url": "https://api.deepinfra.com/v1/openai",
+    "key_env": "DEEPINFRA_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "huggingface": {
+    "base_url": "https://router.huggingface.co/v1",
+    "key_env": "HF_TOKEN",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "dashscope": {
+    "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "key_env": "DASHSCOPE_API_KEY",
+    "protocol": "chat",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "azure": {
+    "base_url": "",
+    "key_env": "AZURE_OPENAI_API_KEY",
+    "protocol": "azure",
+    "local": false,
+    "force": "named",
+    "reasoning": "off"
+  },
+  "compatible": {
+    "base_url": "",
+    "key_env": "",
+    "protocol": "chat",
+    "local": false,
+    "force": "prompt",
+    "reasoning": "off"
+  },
+  "ollama": {
+    "base_url": "http://127.0.0.1:11434/v1",
+    "key_env": "",
+    "protocol": "chat",
+    "local": true,
+    "force": "prompt",
+    "reasoning": "off"
+  },
+  "lmstudio": {
+    "base_url": "http://127.0.0.1:1234/v1",
+    "key_env": "",
+    "protocol": "chat",
+    "local": true,
+    "force": "prompt",
+    "reasoning": "off"
+  },
+  "llamacpp": {
+    "base_url": "http://127.0.0.1:8080/v1",
+    "key_env": "",
+    "protocol": "chat",
+    "local": true,
+    "force": "prompt",
+    "reasoning": "off"
+  },
+  "vllm": {
+    "base_url": "http://127.0.0.1:8000/v1",
+    "key_env": "",
+    "protocol": "chat",
+    "local": true,
+    "force": "prompt",
+    "reasoning": "off"
+  },
+  "sglang": {
+    "base_url": "http://127.0.0.1:30000/v1",
+    "key_env": "",
+    "protocol": "chat",
+    "local": true,
+    "force": "prompt",
+    "reasoning": "off"
+  },
+  "localai": {
+    "base_url": "http://127.0.0.1:8080/v1",
+    "key_env": "",
+    "protocol": "chat",
+    "local": true,
+    "force": "prompt",
+    "reasoning": "off"
+  }
+}

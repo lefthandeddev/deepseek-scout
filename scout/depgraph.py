@@ -10,7 +10,7 @@ import re
 import time
 from pathlib import Path
 
-from .localtools import _is_ignored
+from .localtools import LocalTools
 
 PY_EXT = {".py"}
 JS_EXT = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}
@@ -27,8 +27,8 @@ _cache: dict[str, tuple[float, dict, dict]] = {}
 
 def _collect_files(root: Path) -> list[Path]:
     files = []
-    for p in root.rglob("*"):
-        if not p.is_file() or _is_ignored(p.relative_to(root)):
+    for p in LocalTools(root)._walk_files():
+        if p.stat().st_size > 5_000_000:
             continue
         if p.suffix in PY_EXT | JS_EXT:
             files.append(p)
