@@ -1,0 +1,12 @@
+[
+  {
+    "question": "Where is citation verification implemented, and at what point in the exploration loop does it reject a handoff? I want to change the retry limit.",
+    "root": "./",
+    "thoroughness": "quick"
+  },
+  {
+    "question": "How does the dependency graph builder resolve Python relative imports? I suspect a bug with src-layout packages.",
+    "root": "./",
+    "thoroughness": "medium"
+  }
+]
